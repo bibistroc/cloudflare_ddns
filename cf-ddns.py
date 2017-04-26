@@ -144,11 +144,15 @@ for domain in config['domains']:
                     if not t:
                         raise Exception
 
+                    if not host['proxied']:
+                        print "* Warning: no proxied value, defaulting to no"
+
                     data = json.dumps({
                         'id': host['id'],
                         'type': t,
                         'name': host['name'],
-                        'content': public_ip
+                        'content': public_ip,
+                        'proxied': (host['proxied'] == "yes")
                     })
                     url_path = '{0}{1}{2}{3}'.format(base_url,
                                                      domain['id'],
