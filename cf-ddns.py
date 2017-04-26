@@ -24,51 +24,51 @@ except ImportError:
 import json
 
 
-config_file_name = 'cf-ddns.conf'
+CONFIG_FILE_NAME = 'cf-ddns.conf'
 
-with open(config_file_name, 'r') as config_file:
+with open(CONFIG_FILE_NAME, 'r') as config_file:
     try:
-        config = json.loads(config_file.read())
+        CONFIG = json.loads(config_file.read())
     except ValueError:
-        print('* problem with the config file')
+        print '* problem with the config file'
         exit(0)
 
-if not config['user']['email'] or not config['user']['api_key']:
-    print('* missing CloudFlare auth credentials')
+if not CONFIG['user']['email'] or not CONFIG['user']['api_key']:
+    print '* missing CloudFlare auth credentials'
     exit(0)
 
-content_header = {'X-Auth-Email': config['user']['email'],
-                  'X-Auth-Key': config['user']['api_key'],
+CONTENT_HEADER = {'X-Auth-Email': CONFIG['user']['email'],
+                  'X-Auth-Key': CONFIG['user']['api_key'],
                   'Content-type': 'application/json'}
 
-base_url = 'https://api.cloudflare.com/client/v4/zones/'
+BASE_URL = 'https://api.cloudflare.com/client/v4/zones/'
 
-public_ipv4 = None
-public_ipv6 = None
-ip_version = None
+PUBLIC_IPV4 = None
+PUBLIC_IPV6 = None
+IP_VERSION = None
 
 try:
-    public_ipv4 = urlopen(Request(
+    PUBLIC_IPV4 = urlopen(Request(
         'http://ipv4.icanhazip.com/')).read().rstrip().decode('utf-8')
 except URLError as e:
-    print('* no public IPv4 address detected')
+    print '* no public IPv4 address detected'
 
 try:
-    public_ipv6 = urlopen(Request(
+    PUBLIC_IPV6 = urlopen(Request(
         'http://ipv6.icanhazip.com/')).read().rstrip().decode('utf-8')
 except URLError as e:
-    print('* no public IPv6 address detected')
+    print '* no public IPv6 address detected'
 
-if public_ipv4 is None and public_ipv4 is None:
-    print('* Failed to get any public IP address')
+if PUBLIC_IPV4 is None and PUBLIC_IPV4 is None:
+    print '* Failed to get any public IP address'
     exit(0)
 
-update = False
+UPDATE = False
 
-for domain in config['domains']:
+for domain in CONFIG['domains']:
     # check to make sure domain name is specified
     if not domain['name']:
-        print('* missing domain name')
+        print '* missing domain name'
         continue
 
     # get domain zone id from CloudFlare if missing
@@ -77,7 +77,7 @@ for domain in config['domains']:
             print(
                 '* zone id for "{0}" is missing. attempting to '
                 'get it from cloudflare...'.format(domain['name']))
-            zone_id_req = Request(base_url, headers=content_header)
+            zone_id_req = Request(BASE_URL, headers=CONTENT_HEADER)
             zone_id_resp = urlopen(zone_id_req)
             for d in json.loads(zone_id_resp.read().decode('utf-8'))['result']:
                 if domain['name'] == d['name']:
@@ -85,8 +85,8 @@ for domain in config['domains']:
                     print('* zone id for "{0}" is'
                           ' {1}'.format(domain['name'], domain['id']))
         except HTTPError as e:
-            print('* could not get zone id for: {0}'.format(domain['name']))
-            print('* possible causes: wrong domain and/or auth credentials')
+            print '* could not get zone id for: {0}'.format(domain['name'])
+            print '* possible causes: wrong domain and/or auth credentials'
             continue
 
     # get domain zone id from CloudFlare if missing
@@ -96,7 +96,7 @@ for domain in config['domains']:
         # check to make sure host name is specified
         # otherwise move on to the next host
         if not host['name']:
-            print('* host name missing')
+            print '* host name missing'
             continue
 
         # get host id from CloudFlare if missing
@@ -105,8 +105,8 @@ for domain in config['domains']:
                 '* host id for "{0}" is missing. attempting'
                 ' to get it from cloudflare...'.format(fqdn))
             rec_id_req = Request(
-                base_url + domain['id'] + '/dns_records/',
-                headers=content_header)
+                BASE_URL + domain['id'] + '/dns_records/',
+                headers=CONTENT_HEADER)
             rec_id_resp = urlopen(rec_id_req)
             parsed_host_ids = json.loads(rec_id_resp.read().decode('utf-8'))
             for h in parsed_host_ids['result']:
@@ -119,26 +119,26 @@ for domain in config['domains']:
         for t in host['types']:
             # select which IP to use based on dns record type (e.g. A or AAAA)
             if t not in ('A', 'AAAA'):
-                print('* wrong or missing dns record type: {0}'.format(t))
+                print '* wrong or missing dns record type: {0}'.format(t)
                 continue
             elif t == 'A':
-                if public_ipv4:
-                    public_ip = public_ipv4
-                    ip_version = 'ipv4'
+                if PUBLIC_IPV4:
+                    public_ip = PUBLIC_IPV4
+                    IP_VERSION = 'ipv4'
                 else:
-                    print('* cannot set A record because no IPv4 is available')
+                    print '* cannot set A record because no IPv4 is available'
                     continue
             elif t == 'AAAA':
-                if public_ipv6:
-                    public_ip = public_ipv6
-                    ip_version = 'ipv6'
+                if PUBLIC_IPV6:
+                    public_ip = PUBLIC_IPV6
+                    IP_VERSION = 'ipv6'
                 else:
-                    print('* cannot set AAAA record because'
-                          ' no IPv6 is available')
+                    print '* cannot set AAAA record because no IPv6 is available'
+
                     continue
 
             # update ip address if it has changed since last update
-            if host[ip_version] != public_ip:
+            if host[IP_VERSION] != public_ip:
                 try:
                     # make sure dns record type is specified (e.g A, AAAA)
                     if not t:
@@ -154,20 +154,20 @@ for domain in config['domains']:
                         'content': public_ip,
                         'proxied': (host['proxied'] == "yes")
                     })
-                    url_path = '{0}{1}{2}{3}'.format(base_url,
+                    url_path = '{0}{1}{2}{3}'.format(BASE_URL,
                                                      domain['id'],
                                                      '/dns_records/',
                                                      host['id'])
                     update_request = Request(
                         url_path,
                         data=data.encode('utf-8'),
-                        headers=content_header)
+                        headers=CONTENT_HEADER)
                     update_request.get_method = lambda: 'PUT'
                     update_res_obj = json.loads(
                         urlopen(update_request).read().decode('utf-8'))
                     if update_res_obj['success']:
-                        update = True
-                        host[ip_version] = public_ip
+                        UPDATE = True
+                        host[IP_VERSION] = public_ip
                         print('* update successful (type: {0}, fqdn: {1}'
                               ', ip: {2})'.format(t, fqdn, public_ip))
                 except (Exception, HTTPError) as e:
@@ -175,9 +175,9 @@ for domain in config['domains']:
                           ', ip: {2})'.format(t, fqdn, public_ip))
 
 # if any records were updated, update the config file accordingly
-if update:
-    print('* updates completed. bye.')
-    with open(config_file_name, 'w') as config_file:
-        json.dump(config, config_file, indent=1, sort_keys=True)
+if UPDATE:
+    print '* updates completed. bye.'
+    with open(CONFIG_FILE_NAME, 'w') as config_file:
+        json.dump(CONFIG, config_file, indent=1, sort_keys=True)
 else:
-    print('* nothing to update. bye.')
+    print '* nothing to update. bye.'
